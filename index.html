@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>Folio</title>
+  <meta name="description" content="Read scanned PDFs and photos into text you can correct, compare and export.">
+  <meta name="theme-color" content="#F6F2EA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1E1A15" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Folio">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./vendor/tesseract/tesseract.min.js" defer></script>
+  <script type="module" src="./js/app.js"></script>
+</head>
+<body data-view="welcome" data-tab="text">
+
+  <!-- Title page: open a file, the index of everything read before, backups. -->
+  <main id="welcome" class="view">
+    <div class="welcome-inner">
+      <p class="eyebrow">A reading desk for scanned pages</p>
+      <h1 class="display">Folio</h1>
+      <p class="lede">Open a scanned PDF or photos of pages. Folio reads them into text, shows each line beside the scan it came from, and lets you correct, trim and write it out the way you want.</p>
+      <div class="open-row">
+        <label class="btn btn-ink btn-big">
+          <input type="file" id="file-input" accept="application/pdf,image/*" multiple hidden>
+          Open a PDF or photos
+        </label>
+      </div>
+      <p class="note" id="engine-note">Everything happens on this phone. Nothing is uploaded.</p>
+
+      <div class="rule ornament"><span>❧</span></div>
+
+      <section class="recents">
+        <div class="recents-head">
+          <h2 class="section-title">Your files</h2>
+          <input type="search" id="recent-filter" placeholder="Filter" autocomplete="off" enterkeyhint="search">
+        </div>
+        <ol id="recent-list" class="recent-list"></ol>
+        <p id="recent-empty" class="note empty" hidden>Nothing read yet. Files you open stay here, with your corrections.</p>
+      </section>
+
+      <section class="backup">
+        <h2 class="section-title">Keep a copy</h2>
+        <p class="note">iPhone can clear a web app’s storage if you don’t open it for weeks. Save a backup now and then.</p>
+        <div class="row wrap">
+          <button class="btn" data-action="backup-export">Export backup</button>
+          <label class="btn">
+            <input type="file" id="backup-input" accept="application/json,.json" hidden>
+            Import backup
+          </label>
+          <button class="btn btn-ghost" data-action="appearance">Appearance</button>
+        </div>
+        <label class="check"><input type="checkbox" id="backup-files"> Include the original files (bigger, but complete)</label>
+      </section>
+    </div>
+  </main>
+
+  <!-- The desk: pages, the scan, and the text beside it. -->
+  <div id="workspace" class="view">
+    <header class="bar top">
+      <button class="icon-btn" data-action="close" aria-label="Back to your files">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="title-block">
+        <div id="doc-title" class="doc-title"></div>
+        <div id="doc-summary" class="doc-summary"></div>
+      </div>
+      <button class="icon-btn" data-action="search-toggle" aria-label="Search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+      </button>
+      <button class="icon-btn" data-action="settings" aria-label="Reading settings">
+        <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
+      <button class="icon-btn" data-action="menu" aria-label="More">
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+      </button>
+      <button class="btn btn-ink btn-small export-btn" data-action="export">Export</button>
+    </header>
+
+    <div id="search-row" class="search-row" hidden>
+      <input type="search" id="search-input" placeholder="Search the text" autocomplete="off" autocorrect="off" enterkeyhint="search">
+      <span id="search-count" class="search-count"></span>
+      <button class="icon-btn small" data-action="hit-prev" aria-label="Previous match"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+      <button class="icon-btn small" data-action="hit-next" aria-label="Next match"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+
+    <div id="reading-bar" class="reading-bar" hidden></div>
+
+    <div class="desk">
+      <aside id="pages-panel" class="panel pages-panel">
+        <div class="panel-head"><span class="small-caps">Pages</span><span id="pages-count" class="faint"></span></div>
+        <ol id="page-list" class="page-list"></ol>
+      </aside>
+
+      <section id="scan-panel" class="panel scan-panel">
+        <div class="panel-head">
+          <span id="scan-title" class="small-caps"></span>
+          <div class="seg" id="overlay-seg">
+            <button data-overlay="boxes">Boxes</button>
+            <button data-overlay="text">Text on scan</button>
+            <button data-overlay="clean">Clean</button>
+          </div>
+          <div class="zoom">
+            <button class="icon-btn small" data-action="zoom-out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+            <button class="icon-btn small" data-action="zoom-in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button>
+          </div>
+        </div>
+        <div id="scan-scroll" class="scan-scroll">
+          <div id="scan-stage" class="scan-stage"></div>
+        </div>
+        <div class="page-nav">
+          <button class="btn btn-ghost btn-small" data-action="page-prev">‹ Previous</button>
+          <button class="btn btn-ghost btn-small" id="exclude-btn" data-action="exclude">Leave page out</button>
+          <button class="btn btn-ghost btn-small" data-action="page-next">Next ›</button>
+        </div>
+      </section>
+
+      <section id="text-panel" class="panel text-panel">
+        <div class="tabs">
+          <button data-itab="blocks" class="on">Compare &amp; correct</button>
+          <button data-itab="output">As written</button>
+        </div>
+        <div id="inspector" class="inspector"></div>
+      </section>
+    </div>
+
+    <nav class="bar bottom tabbar" id="tabbar">
+      <button data-tab="pages"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="11" height="15" rx="1"/><path d="M8 21h11V7"/></svg><span>Pages</span></button>
+      <button data-tab="scan"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Scan</span></button>
+      <button data-tab="text"><svg viewBox="0 0 24 24"><path d="M5 19l1-4L16 5l3 3L9 18z"/><path d="M14 7l3 3"/></svg><span>Correct</span></button>
+    </nav>
+  </div>
+
+  <!-- Sheets slide up over everything. -->
+  <div id="sheet-backdrop" class="sheet-backdrop" hidden></div>
+  <div id="sheet" class="sheet" hidden role="dialog" aria-modal="true"></div>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="print-root" class="print-root" aria-hidden="true"></div>
+</body>
+</html>
